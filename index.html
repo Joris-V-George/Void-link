@@ -311,6 +311,7 @@
     $('messages').scrollTop = $('messages').scrollHeight;
   }
   function unlockChat(){
+    clearTimeout(connectTimeout);
     showCard(null);
     $('handshake-view').hidden = true;
     $('chat-view').hidden = false;
@@ -321,6 +322,28 @@
   // ---------- networking (PeerJS only used to locate the peer) ----------
   let peer = null;
   let conn = null;
+  let connectTimeout = null;
+
+  // STUN alone only works when both devices can reach each other directly.
+  // Many routers (AP/client isolation) and mobile networks block that even
+  // on the "same" network, so a TURN relay is needed as a fallback path.
+  // This still never touches message content — it just relays already
+  // end-to-end-encrypted bytes it cannot read.
+  const ICE_CONFIG = {
+    iceServers: [
+      {urls:'stun:stun.l.google.com:19302'},
+      {urls:'turn:openrelay.metered.ca:80', username:'openrelayproject', credential:'openrelayproject'},
+      {urls:'turn:openrelay.metered.ca:443', username:'openrelayproject', credential:'openrelayproject'},
+      {urls:'turn:openrelay.metered.ca:443?transport=tcp', username:'openrelayproject', credential:'openrelayproject'}
+    ]
+  };
+
+  function armConnectTimeout(el){
+    clearTimeout(connectTimeout);
+    connectTimeout = setTimeout(() => {
+      el.innerHTML = el.textContent + '<br><span style="color:var(--text-faint);font-size:11px;">Still trying — this usually means a router/firewall is blocking a direct link between the devices. Open the browser console (F12) and look for an ICE-related error if this persists.</span>';
+    }, 12000);
+  }
 
   function wireConnection(c){
     conn = c;
@@ -357,11 +380,12 @@
     myKeyPair = await genKeyPair();
     const myPub = await exportPubKey(myKeyPair);
 
-    peer = new Peer();
+    peer = new Peer(undefined, {config: ICE_CONFIG});
     peer.on('open', (id) => {
       const link = location.origin + location.pathname + '#h=' + id + '.' + myPub;
       $('link-text').textContent = link;
       new QRCode($('qr-holder'), {text: link, width:188, height:188, colorDark:'#14110F', colorLight:'#ffffff'});
+      armConnectTimeout($('hs-host-status'));
     });
     peer.on('connection', (c) => {
       $('hs-host-status').textContent = 'Peer found — completing handshake…';
@@ -377,9 +401,10 @@
     const hostPub = await importPeerPubKey(hostPubB64);
     await deriveSecrets(hostPub); // guest can derive immediately — already has host's public key
 
-    peer = new Peer();
+    peer = new Peer(undefined, {config: ICE_CONFIG});
     peer.on('open', () => {
       $('hs-guest-status').textContent = 'Opening direct line to peer…';
+      armConnectTimeout($('hs-guest-status'));
       const c = peer.connect(hostId, {reliable:true});
       c.on('open', async () => {
         const myPub = await exportPubKey(myKeyPair);
