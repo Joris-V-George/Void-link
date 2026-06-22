@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>VOID//LINK</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.5.5/peerjs.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<style>
+  :root{
+    --bg:#14110F;
+    --bg-alt:#1A1613;
+    --surface:#211C18;
+    --surface-2:#2A241F;
+    --border:#3A322B;
+    --text:#EDE6DA;
+    --text-dim:#9A8F80;
+    --text-faint:#6B6258;
+    --accent:#C97B3D;
+    --accent-soft:rgba(201,123,61,.14);
+    --ok:#7FA084;
+    --ok-soft:rgba(127,160,132,.15);
+    --danger:#C0604A;
+    --danger-soft:rgba(192,96,74,.15);
+    --mono:'IBM Plex Mono',monospace;
+    --sans:'Sora',sans-serif;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{height:100%;}
+  body{
+    margin:0;background:var(--bg);color:var(--text);font-family:var(--sans);
+    overflow:hidden;
+  }
+  body::before{
+    content:'';position:fixed;inset:0;pointer-events:none;z-index:999;
+    background:repeating-linear-gradient(0deg,rgba(255,255,255,.025) 0px,rgba(255,255,255,.025) 1px,transparent 1px,transparent 3px);
+    opacity:.5;
+  }
+  #app{
+    height:100vh;display:flex;flex-direction:column;max-width:560px;margin:0 auto;
+    border-left:1px solid var(--border);border-right:1px solid var(--border);
+  }
+  header{
+    display:flex;align-items:center;justify-content:space-between;
+    padding:16px 18px;border-bottom:1px solid var(--border);background:var(--bg-alt);
+    flex-shrink:0;
+  }
+  .brand{font-family:var(--mono);font-weight:600;font-size:15px;letter-spacing:.06em;color:var(--text);}
+  .brand span{color:var(--accent);}
+  .status-pill{
+    display:flex;align-items:center;gap:6px;font-family:var(--mono);font-size:11px;
+    letter-spacing:.05em;padding:5px 10px;border-radius:20px;background:var(--surface);
+    border:1px solid var(--border);color:var(--text-dim);
+  }
+  .status-dot{width:7px;height:7px;border-radius:50%;background:var(--text-faint);flex-shrink:0;}
+  .status-dot.pulse{animation:pulse 1.4s ease-in-out infinite;background:var(--accent);}
+  .status-dot.ok{background:var(--ok);animation:none;}
+  .status-dot.err{background:var(--danger);animation:none;}
+  @keyframes pulse{0%,100%{opacity:1;}50%{opacity:.25;}}
+
+  main{flex:1;display:flex;flex-direction:column;overflow:hidden;position:relative;}
+  section{flex:1;display:flex;flex-direction:column;overflow-y:auto;}
+  [hidden]{display:none !important;}
+
+  /* ---- handshake view ---- */
+  #handshake-view{align-items:center;justify-content:center;padding:32px 24px;text-align:center;gap:0;}
+  .hs-card{display:flex;flex-direction:column;align-items:center;gap:18px;max-width:380px;}
+  .hs-label{font-family:var(--mono);font-size:11px;letter-spacing:.12em;color:var(--text-faint);text-transform:uppercase;}
+  .hs-title{font-size:21px;font-weight:600;line-height:1.4;}
+  .qr-frame{background:#fff;padding:14px;border-radius:6px;border:2px solid var(--accent);box-shadow:0 0 0 1px var(--bg-alt);}
+  #qr-holder{width:188px;height:188px;}
+  .link-row{
+    display:flex;width:100%;align-items:stretch;gap:8px;
+  }
+  .link-box{
+    flex:1;font-family:var(--mono);font-size:11.5px;color:var(--text-dim);background:var(--surface);
+    border:1px solid var(--border);border-radius:8px;padding:10px 12px;overflow-x:auto;white-space:nowrap;
+    text-align:left;
+  }
+  button{
+    font-family:var(--sans);font-weight:600;font-size:13.5px;border-radius:8px;border:none;cursor:pointer;
+    transition:opacity .15s ease, transform .1s ease;
+  }
+  button:active{transform:scale(.97);}
+  .btn-accent{background:var(--accent);color:#1A1310;padding:10px 16px;}
+  .btn-accent:hover{opacity:.9;}
+  .btn-ghost{background:var(--surface);color:var(--text);border:1px solid var(--border);padding:10px 14px;}
+  .btn-ghost:hover{background:var(--surface-2);}
+  .hs-note{font-size:12.5px;color:var(--text-faint);line-height:1.6;max-width:320px;}
+  .spinner-text{font-family:var(--mono);font-size:13px;color:var(--accent);letter-spacing:.04em;}
+
+  /* ---- chat view ---- */
+  #chat-view{padding:0;}
+  .fp-strip{
+    flex-shrink:0;border-bottom:1px solid var(--border);background:var(--bg-alt);
+    padding:10px 16px;cursor:pointer;
+  }
+  .fp-row{display:flex;align-items:center;justify-content:space-between;}
+  .fp-label{font-family:var(--mono);font-size:11px;color:var(--ok);letter-spacing:.05em;}
+  .fp-chevron{color:var(--text-faint);font-size:11px;}
+  .fp-detail{display:none;margin-top:10px;}
+  .fp-detail.open{display:block;}
+  .fp-bars{display:flex;gap:3px;align-items:flex-end;height:36px;margin-bottom:8px;}
+  .fp-bar{flex:1;background:var(--accent);border-radius:2px;min-height:3px;}
+  .fp-hex{font-family:var(--mono);font-size:12px;color:var(--text-dim);letter-spacing:.05em;word-break:break-all;}
+  .fp-instructions{font-size:11.5px;color:var(--text-faint);margin-top:8px;line-height:1.5;}
+
+  #messages{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:10px;}
+  .msg{max-width:78%;display:flex;flex-direction:column;gap:3px;}
+  .msg.me{align-self:flex-end;align-items:flex-end;}
+  .msg.peer{align-self:flex-start;align-items:flex-start;}
+  .msg-meta{font-family:var(--mono);font-size:10px;color:var(--text-faint);letter-spacing:.04em;}
+  .msg-bubble{
+    padding:9px 12px;border-radius:3px;font-size:14.5px;line-height:1.45;white-space:pre-wrap;word-break:break-word;
+    border-left:3px solid var(--accent);background:var(--surface);
+  }
+  .msg.peer .msg-bubble{border-left-color:var(--ok);}
+  .sys-msg{align-self:center;font-family:var(--mono);font-size:11px;color:var(--text-faint);padding:4px 0;}
+
+  .input-bar{
+    flex-shrink:0;display:flex;gap:8px;padding:12px;border-top:1px solid var(--border);background:var(--bg-alt);
+  }
+  #msg-input{
+    flex:1;resize:none;background:var(--surface);border:1px solid var(--border);border-radius:8px;
+    color:var(--text);font-family:var(--sans);font-size:14px;padding:10px 12px;max-height:90px;outline:none;
+  }
+  #msg-input:focus{border-color:var(--accent);}
+  #send-btn{padding:0 18px;}
+  #send-btn:disabled{opacity:.4;cursor:not-allowed;}
+
+  footer{
+    flex-shrink:0;text-align:center;padding:8px;font-family:var(--mono);font-size:10px;
+    color:var(--text-faint);border-top:1px solid var(--border);letter-spacing:.04em;
+  }
+  ::-webkit-scrollbar{width:6px;}
+  ::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px;}
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <div class="brand">VOID<span>//</span>LINK</div>
+    <div class="status-pill"><span class="status-dot" id="status-dot"></span><span id="status-text">IDLE</span></div>
+  </header>
+
+  <main>
+    <section id="handshake-view">
+      <div class="hs-card" id="hs-host-card" hidden>
+        <div class="hs-label">Step 1 — share this</div>
+        <div class="hs-title">Send this link or QR to the person you want to talk to.</div>
+        <div class="qr-frame"><div id="qr-holder"></div></div>
+        <div class="link-row">
+          <div class="link-box" id="link-text"></div>
+          <button class="btn-accent" id="copy-link-btn">Copy</button>
+        </div>
+        <div class="spinner-text" id="hs-host-status">Waiting for peer to open the link…</div>
+        <div class="hs-note">Keys are generated fresh in your browser. The link carries your public key — nothing is ever sent to a server.</div>
+      </div>
+
+      <div class="hs-card" id="hs-guest-card" hidden>
+        <div class="hs-label">Step 2 — connecting</div>
+        <div class="hs-title">Establishing a direct, encrypted line to your peer…</div>
+        <div class="spinner-text" id="hs-guest-status">Contacting peer…</div>
+        <div class="hs-note">This only uses a public relay to find your peer's device. Once connected, messages travel directly and are end-to-end encrypted.</div>
+      </div>
+
+      <div class="hs-card" id="hs-error-card" hidden>
+        <div class="hs-label" style="color:var(--danger)">Connection problem</div>
+        <div class="hs-title" id="hs-error-text">Something went wrong.</div>
+        <button class="btn-ghost" onclick="location.reload()">Start a new session</button>
+      </div>
+    </section>
+
+    <section id="chat-view" hidden>
+      <div class="fp-strip" id="fp-strip">
+        <div class="fp-row">
+          <span class="fp-label">● SECURE — TAP TO VERIFY</span>
+          <span class="fp-chevron" id="fp-chevron">▾</span>
+        </div>
+        <div class="fp-detail" id="fp-detail">
+          <div class="fp-bars" id="fp-bars"></div>
+          <div class="fp-hex" id="fp-hex"></div>
+          <div class="fp-instructions">Read this code to your peer over a phone call or in person. If it doesn't match what they see, end the session — your connection may not be what you think it is.</div>
+        </div>
+      </div>
+      <div id="messages"></div>
+      <div class="input-bar">
+        <textarea id="msg-input" rows="1" placeholder="Type a message…"></textarea>
+        <button class="btn-accent" id="send-btn">Send</button>
+      </div>
+    </section>
+  </main>
+
+  <footer>NOTHING IS STORED · NOTHING SURVIVES A REFRESH</footer>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  // ---------- small utils ----------
+  const $ = (id) => document.getElementById(id);
+  const buf2b64 = (buf) => btoa(String.fromCharCode(...new Uint8Array(buf)))
+    .replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+  const b642buf = (str) => {
+    str = str.replace(/-/g,'+').replace(/_/g,'/');
+    while (str.length % 4) str += '=';
+    const bin = atob(str);
+    const arr = new Uint8Array(bin.length);
+    for (let i=0;i<bin.length;i++) arr[i] = bin.charCodeAt(i);
+    return arr.buffer;
+  };
+  const buf2hex = (buf) => [...new Uint8Array(buf)].map(b=>b.toString(16).padStart(2,'0')).join('');
+  const enc = new TextEncoder();
+  const dec = new TextDecoder();
+
+  function setStatus(text, mode){
+    $('status-text').textContent = text;
+    const dot = $('status-dot');
+    dot.className = 'status-dot' + (mode ? ' '+mode : '');
+  }
+  function showCard(id){
+    ['hs-host-card','hs-guest-card','hs-error-card'].forEach(c=>{
+      $(c).hidden = (c !== id);
+    });
+  }
+  function showError(msg){
+    showCard('hs-error-card');
+    $('hs-error-text').textContent = msg;
+    setStatus('FAILED','err');
+  }
+
+  // ---------- crypto layer ----------
+  // ECDH (P-256) per-session keypair -> shared secret -> domain-separated
+  // SHA-256 derivation into (a) a non-extractable AES-256-GCM key for messages
+  // and (b) a separate fingerprint hash for human verification.
+  let myKeyPair = null;
+  let aesKey = null;
+
+  async function genKeyPair(){
+    return crypto.subtle.generateKey({name:'ECDH', namedCurve:'P-256'}, true, ['deriveBits']);
+  }
+  async function exportPubKey(keyPair){
+    const raw = await crypto.subtle.exportKey('raw', keyPair.publicKey);
+    return buf2b64(raw);
+  }
+  async function importPeerPubKey(b64){
+    const raw = b642buf(b64);
+    return crypto.subtle.importKey('raw', raw, {name:'ECDH', namedCurve:'P-256'}, [], []);
+  }
+  async function hashWithInfo(rawBits, info){
+    const infoBytes = enc.encode(info);
+    const combined = new Uint8Array(rawBits.byteLength + infoBytes.byteLength);
+    combined.set(new Uint8Array(rawBits), 0);
+    combined.set(infoBytes, rawBits.byteLength);
+    return crypto.subtle.digest('SHA-256', combined);
+  }
+  async function deriveSecrets(peerPublicKey){
+    const rawBits = await crypto.subtle.deriveBits(
+      {name:'ECDH', public: peerPublicKey}, myKeyPair.privateKey, 256
+    );
+    const encDigest = await hashWithInfo(rawBits, 'voidlink-enc-v1');
+    const fpDigest  = await hashWithInfo(rawBits, 'voidlink-fingerprint-v1');
+    aesKey = await crypto.subtle.importKey('raw', encDigest, {name:'AES-GCM'}, false, ['encrypt','decrypt']);
+    renderFingerprint(new Uint8Array(fpDigest));
+  }
+  async function encryptText(text){
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const ct = await crypto.subtle.encrypt({name:'AES-GCM', iv}, aesKey, enc.encode(text));
+    return {iv: buf2b64(iv), ct: buf2b64(ct)};
+  }
+  async function decryptText(ivB64, ctB64){
+    const iv = b642buf(ivB64);
+    const pt = await crypto.subtle.decrypt({name:'AES-GCM', iv}, aesKey, b642buf(ctB64));
+    return dec.decode(pt);
+  }
+
+  function renderFingerprint(bytes){
+    const bars = $('fp-bars'); bars.innerHTML = '';
+    for (let i=0;i<16;i++){
+      const d = document.createElement('div');
+      d.className = 'fp-bar';
+      d.style.height = Math.max(6, (bytes[i]/255)*36) + 'px';
+      bars.appendChild(d);
+    }
+    $('fp-hex').textContent = buf2hex(bytes.slice(0,16).buffer).toUpperCase().replace(/(..)/g,'$1 ').trim();
+  }
+
+  // ---------- chat rendering ----------
+  function addMessage(text, who){
+    const wrap = document.createElement('div');
+    wrap.className = 'msg ' + (who === 'me' ? 'me' : 'peer');
+    const meta = document.createElement('div');
+    meta.className = 'msg-meta';
+    const t = new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+    meta.textContent = (who === 'me' ? 'YOU' : 'PEER') + ' · ' + t;
+    const bubble = document.createElement('div');
+    bubble.className = 'msg-bubble';
+    bubble.textContent = text;
+    wrap.appendChild(meta); wrap.appendChild(bubble);
+    $('messages').appendChild(wrap);
+    $('messages').scrollTop = $('messages').scrollHeight;
+  }
+  function addSystem(text){
+    const d = document.createElement('div');
+    d.className = 'sys-msg';
+    d.textContent = text;
+    $('messages').appendChild(d);
+    $('messages').scrollTop = $('messages').scrollHeight;
+  }
+  function unlockChat(){
+    showCard(null);
+    $('handshake-view').hidden = true;
+    $('chat-view').hidden = false;
+    setStatus('SECURE', 'ok');
+    addSystem('Encrypted line established. Messages never leave this connection.');
+  }
+
+  // ---------- networking (PeerJS only used to locate the peer) ----------
+  let peer = null;
+  let conn = null;
+
+  function wireConnection(c){
+    conn = c;
+    conn.on('data', async (data) => {
+      try{
+        if (data.type === 'hello'){
+          // host receives guest's public key, completes derivation, acks
+          const peerPub = await importPeerPubKey(data.pub);
+          await deriveSecrets(peerPub);
+          conn.send({type:'ready'});
+          unlockChat();
+        } else if (data.type === 'ready'){
+          // guest learns host finished deriving the same key
+          unlockChat();
+        } else if (data.type === 'msg'){
+          const text = await decryptText(data.iv, data.ct);
+          addMessage(text, 'peer');
+        }
+      }catch(e){
+        addSystem('Received an undecryptable message — discarded.');
+      }
+    });
+    conn.on('close', () => {
+      setStatus('PEER LEFT', 'err');
+      addSystem('Peer disconnected. Refresh to start a new session.');
+      $('send-btn').disabled = true;
+    });
+    conn.on('error', () => showError('The connection dropped unexpectedly.'));
+  }
+
+  async function startHost(){
+    showCard('hs-host-card');
+    setStatus('LISTENING', 'pulse');
+    myKeyPair = await genKeyPair();
+    const myPub = await exportPubKey(myKeyPair);
+
+    peer = new Peer();
+    peer.on('open', (id) => {
+      const link = location.origin + location.pathname + '#h=' + id + '.' + myPub;
+      $('link-text').textContent = link;
+      new QRCode($('qr-holder'), {text: link, width:188, height:188, colorDark:'#14110F', colorLight:'#ffffff'});
+    });
+    peer.on('connection', (c) => {
+      $('hs-host-status').textContent = 'Peer found — completing handshake…';
+      wireConnection(c);
+    });
+    peer.on('error', (err) => showError('Could not reach the connection relay (' + err.type + '). Check your network and try again.'));
+  }
+
+  async function startGuest(hostId, hostPubB64){
+    showCard('hs-guest-card');
+    setStatus('CONNECTING', 'pulse');
+    myKeyPair = await genKeyPair();
+    const hostPub = await importPeerPubKey(hostPubB64);
+    await deriveSecrets(hostPub); // guest can derive immediately — already has host's public key
+
+    peer = new Peer();
+    peer.on('open', () => {
+      $('hs-guest-status').textContent = 'Opening direct line to peer…';
+      const c = peer.connect(hostId, {reliable:true});
+      c.on('open', async () => {
+        const myPub = await exportPubKey(myKeyPair);
+        c.send({type:'hello', pub: myPub});
+      });
+      wireConnection(c);
+    });
+    peer.on('error', (err) => showError('Could not reach the connection relay (' + err.type + '). The host link may have expired.'));
+  }
+
+  // ---------- send flow ----------
+  async function sendCurrentMessage(){
+    const input = $('msg-input');
+    const text = input.value.trim();
+    if (!text || !conn || !aesKey) return;
+    const payload = await encryptText(text);
+    conn.send({type:'msg', ...payload});
+    addMessage(text, 'me');
+    input.value = '';
+    input.style.height = 'auto';
+  }
+  $('send-btn').addEventListener('click', sendCurrentMessage);
+  $('msg-input').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey){ e.preventDefault(); sendCurrentMessage(); }
+  });
+  $('msg-input').addEventListener('input', (e) => {
+    e.target.style.height = 'auto';
+    e.target.style.height = Math.min(90, e.target.scrollHeight) + 'px';
+  });
+  $('copy-link-btn').addEventListener('click', () => {
+    const text = $('link-text').textContent;
+    navigator.clipboard?.writeText(text).then(() => {
+      const btn = $('copy-link-btn');
+      const old = btn.textContent; btn.textContent = 'Copied';
+      setTimeout(()=>btn.textContent = old, 1400);
+    });
+  });
+  $('fp-strip').addEventListener('click', () => {
+    $('fp-detail').classList.toggle('open');
+    $('fp-chevron').textContent = $('fp-detail').classList.contains('open') ? '▴' : '▾';
+  });
+
+  // ---------- entry point ----------
+  function init(){
+    const hash = location.hash;
+    const match = hash.match(/^#h=([^.]+)\.(.+)$/);
+    if (match){
+      startGuest(match[1], match[2]).catch(e => showError('Setup failed: ' + e.message));
+    } else {
+      startHost().catch(e => showError('Setup failed: ' + e.message));
+    }
+  }
+  init();
+})();
+</script>
+</body>
+</html>
